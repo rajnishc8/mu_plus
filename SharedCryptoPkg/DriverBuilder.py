@@ -87,7 +87,7 @@ def PublishNuget():
     # move the EFI's we generated to a folder to upload
 
     logging.info("Running NugetPackager")
-    output_dir = os.path.join(rootDir, "Build", ".NugetOutput")
+    output_dir = os.path.join(rootDir, "Build", "SharedCrypto_Nuget")
 
     try:
         if os.path.exists(output_dir):
