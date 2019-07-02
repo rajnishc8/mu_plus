@@ -27,7 +27,7 @@ WORKSPACE_PATH = os.path.dirname(SCRIPT_PATH)
 REQUIRED_REPOS = ('Common/MU_TIANO', "MU_BASECORE", "Silicon/Arm/MU_TIANO")
 PROJECT_SCOPE = ("corebuild", "sharedcrypto_build")
 
-MODULE_PKGS = ('Common/MU_TIANO', "Silicon/Arm/MU_TIANO", "MU_BASECORE")
+MODULE_PKGS = ('SharedCryptoPkg/MU_BASECORE_extdep/MU_BASECORE', "SharedCryptoPkg/MU_ARM_TIANO_extdep/MU_ARM_TIANO", "SharedCryptoPkg/MU_TIANO_extdep/MU_TIANO")
 MODULE_PKG_PATHS = ";".join(os.path.join(WORKSPACE_PATH, pkg_name) for pkg_name in MODULE_PKGS)
 ACTIVE_TARGET = None
 VERSION = "2019.03.04.01"
