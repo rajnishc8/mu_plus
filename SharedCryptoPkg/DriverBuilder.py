@@ -97,9 +97,10 @@ def PublishNuget():
         logging.error("Ran into trouble getting Nuget Output Path setup")
         return False
 
-    # copy the md file
+    # copy the release notes and the license
     CopyFile(scriptDir, output_dir, "feature_sharedcrypto.md")
     CopyFile(scriptDir, output_dir, "release_notes.md")
+    CopyFile(scriptDir, output_dir, "LICENSE.txt")
     CopyFile(os.path.join(scriptDir,"Driver"), output_dir, "Mu-SharedCrypto.md")
 
     sharedcrypto_build_dir = os.path.realpath(os.path.join(rootDir, "Build", "SharedCryptoPkg_Driver"))
