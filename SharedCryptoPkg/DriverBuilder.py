@@ -25,7 +25,7 @@ except ImportError:
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 WORKSPACE_PATH = os.path.dirname(SCRIPT_PATH)
 REQUIRED_REPOS = ('Common/MU_TIANO', "MU_BASECORE", "Silicon/Arm/MU_TIANO")
-PROJECT_SCOPE = ("corebuild", "")
+PROJECT_SCOPE = ("corebuild", "sharedcrypto_build")
 
 MODULE_PKGS = ('Common/MU_TIANO', "Silicon/Arm/MU_TIANO", "MU_BASECORE")
 MODULE_PKG_PATHS = ";".join(os.path.join(WORKSPACE_PATH, pkg_name) for pkg_name in MODULE_PKGS)
