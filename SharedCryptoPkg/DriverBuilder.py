@@ -105,7 +105,7 @@ def GetLatestNugetVersion(package_name, source=None):
 
 def GetNextVersion():
     # first get the last version
-    version = GetLatestNugetVersion("Mu-SharedCrypto")
+    version = GetLatestNugetVersion("Mu-SharedCrypto")  # TODO: read the JSON file that configures this
     # Then use the nuget dependency to download that version into a temporary folder
     # Unpack and read the previous release notes
     # Get the current hashes of open ssl and ourself
