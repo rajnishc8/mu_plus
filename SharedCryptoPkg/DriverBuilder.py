@@ -10,9 +10,12 @@ import logging
 from MuEnvironment.UefiBuild import UefiBuilder
 from MuPythonLibrary import UtilityFunctions
 from MuEnvironment import CommonBuildEntry
+from MuEnvironment.NugetDependency import NugetDependency
+from MuPythonLibrary.UtilityFunctions import RunCmd
 import shutil
 import argparse
 import glob
+from io import StringIO
 try:
     from importlib import reload  # Python 3.4+ only.
 except ImportError:
@@ -30,7 +33,7 @@ PROJECT_SCOPE = ("corebuild", "sharedcrypto_build")
 MODULE_PKGS = ('SharedCryptoPkg/MU_BASECORE_extdep/MU_BASECORE', "SharedCryptoPkg/MU_ARM_TIANO_extdep/MU_ARM_TIANO", "SharedCryptoPkg/MU_TIANO_extdep/MU_TIANO")
 MODULE_PKG_PATHS = ";".join(os.path.join(WORKSPACE_PATH, pkg_name) for pkg_name in MODULE_PKGS)
 ACTIVE_TARGET = None
-VERSION = "2019.03.04.01"
+
 
 # Because we reimport this module we need to grab the other version when we are in PlatformBuildworker namespace as opposed to main
 def GetAPIKey():
@@ -39,15 +42,18 @@ def GetAPIKey():
         return API_KEY
     else:
         pbw = __import__("__main__")
-        return pbw.API_KEY # import the API KEY
+        return pbw.API_KEYv  # import the API KEY
+
 
 def SetAPIKey(key):
     global API_KEY
     API_KEY = key
 
+
 def SetBuildTarget(key):
     global ACTIVE_TARGET
     ACTIVE_TARGET = key
+
 
 def GetBuildTarget():
     if __name__ == "__main__":
@@ -56,6 +62,7 @@ def GetBuildTarget():
     else:
         pbw = __import__("__main__")
         return pbw.ACTIVE_TARGET
+
 
 def CopyFile(srcDir, destDir, file_name=None):
     if file_name is None:
@@ -80,6 +87,36 @@ def GetTarget(path: str):
     return None
 
 
+def GetLatestNugetVersion(package_name, source=None):
+    cmd = NugetDependency.GetNugetCmd()
+    cmd += ["list"]
+    cmd += [package_name]
+    if source is not None:
+        cmd += ["-Source", source]
+    return_buffer = StringIO()
+    if (RunCmd(cmd[0], " ".join(cmd[1:]), outstream=return_buffer) == 0):
+        # Seek to the beginning of the output buffer and capture the output.
+        return_buffer.seek(0)
+        return_string = return_buffer.read()
+        return return_string.strip().strip(package_name).strip()
+    else:
+        return "0.0.0.0"
+
+
+def GetNextVersion():
+    # first get the last version
+    version = GetLatestNugetVersion("Mu-SharedCrypto")
+    # Then use the nuget dependency to download that version into a temporary folder
+    # Unpack and read the previous release notes
+    # Get the current hashes of open ssl and ourself
+    # Figure out what release branch we are in
+    # Put that as the first two pieces of our version
+    # Create our release notes, appending the old ones
+    # Copy that into NugetOuput
+    print(version)
+    return version
+
+
 def PublishNuget():
     # get the root directory of mu_basecore
     scriptDir = SCRIPT_PATH
@@ -93,15 +130,14 @@ def PublishNuget():
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir, ignore_errors=False)
         os.makedirs(output_dir)
-    except:
+    except Exception:
         logging.error("Ran into trouble getting Nuget Output Path setup")
         return False
 
     # copy the release notes and the license
     CopyFile(scriptDir, output_dir, "feature_sharedcrypto.md")
-    CopyFile(scriptDir, output_dir, "release_notes.md")
     CopyFile(scriptDir, output_dir, "LICENSE.txt")
-    CopyFile(os.path.join(scriptDir,"Driver"), output_dir, "Mu-SharedCrypto.md")
+    CopyFile(os.path.join(scriptDir, "Driver"), output_dir, "Mu-SharedCrypto.md")
 
     sharedcrypto_build_dir = os.path.realpath(os.path.join(rootDir, "Build", "SharedCryptoPkg_Driver"))
     sharedcrypto_build_dir_offset = len(sharedcrypto_build_dir) + 1
@@ -124,10 +160,12 @@ def PublishNuget():
 
     API_KEY = GetAPIKey()
     if API_KEY is not None:
+        VERSION = GetNextVersion()
+        CopyFile(scriptDir, output_dir, "release_notes.md")  # we will generate new release notes when we Get the next version
         logging.info("Attempting to publish the Nuget package")
-
         config_file = os.path.join("Driver", "Mu-SharedCrypto.config.json")
-        params = "--Operation PackAndPush --ConfigFilePath {0} --Version {1} --InputFolderPath {2}  --ApiKey {3}".format(config_file,VERSION, output_dir, API_KEY)
+        params = "--Operation PackAndPush --ConfigFilePath {0} --Version {1} --InputFolderPath {2}  --ApiKey {3}".format(config_file, VERSION, output_dir, API_KEY)
+        # TODO: change this from a runcmd to directly invoking nuget publishing
         ret = UtilityFunctions.RunCmd("nuget-publish", params, capture=True, workingdir=scriptDir)
         if ret == 0:
             logging.critical("Finished publishing Nuget version {0}".format(VERSION))
@@ -156,7 +194,7 @@ def MoveArchTargetSpecificFile(binary, offset, output_dir):
 
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    logging.info("Copying {0}: {1}".format(binary_name,binary))
+    logging.info("Copying {0}: {1}".format(binary_name, binary))
     CopyFile(binary_folder, dest_path, binary_name)
 
 
@@ -179,7 +217,7 @@ class PlatformBuilder(UefiBuilder):
         self.env.SetValue("BUILDREPORTING", "TRUE", "Platform Hardcoded")
         self.env.SetValue("BUILDREPORT_TYPES", 'PCD DEPEX LIBRARY BUILD_FLAGS', "Platform Hardcoded")
 
-        #self.env.SetValue("CONF_TEMPLATE_DIR", "NetworkPkg", "Conf template directory hardcoded - temporary and should go away")
+        # self.env.SetValue("CONF_TEMPLATE_DIR", "NetworkPkg", "Conf template directory hardcoded - temporary and should go away")
 
         self.env.SetValue("LaunchBuildLogProgram", "Notepad", "default - will fail if already set", True)
         self.env.SetValue("LaunchLogOnSuccess", "False", "default - will fail if already set", True)
@@ -190,6 +228,7 @@ class PlatformBuilder(UefiBuilder):
 
     def PlatformPostBuild(self):
         return 0
+
     # ------------------------------------------------------------------
     #
     # Method for the platform to check if a gated build is needed
@@ -203,12 +242,11 @@ class PlatformBuilder(UefiBuilder):
 
     def PlatformFlashImage(self):
         # we have to restore checkpoint in flash as there are certain steps that run inbetween PostBuild and Flash (build report, etc)
-        self.env.internal_shell_env.restore_checkpoint(self.shell_checkpoint) # revert the last checkpoint
+        self.env.internal_shell_env.restore_checkpoint(self.shell_checkpoint)  # revert the last checkpoint
         return 0
 
-# ==========================================================================
-#
 
+# ==========================================================================
 def reload_logging():
     logging.disable(logging.NOTSET)
     logging.shutdown()
@@ -221,9 +259,9 @@ if __name__ == '__main__':
     args = [sys.argv[0]]
     parser = argparse.ArgumentParser(description='Grab API Key')
     parser.add_argument('--api-key', dest="api_key", help='API key for NuGet')
-    parsed_args, remaining_args = parser.parse_known_args() # this strips the first argument off
-    if remaining_args is not None: # any arguments that remain need to be tacked on
-        args.extend(remaining_args) # tack them on after the first argument
+    parsed_args, remaining_args = parser.parse_known_args()  # this strips the first argument off
+    if remaining_args is not None:  # any arguments that remain need to be tacked on
+        args.extend(remaining_args)  # tack them on after the first argument
     sys.argv = args
     SetAPIKey(parsed_args.api_key)  # Set the API ley
 
@@ -242,7 +280,7 @@ if __name__ == '__main__':
         reload_logging()
     # we've finished building
     # if we want to be verbose?
-    #logging.getLogger("").setLevel(logging.INFO)
+    logging.getLogger("").setLevel(logging.INFO)
 
     logging.critical("--Creating NUGET package--")
     if not PublishNuget():
