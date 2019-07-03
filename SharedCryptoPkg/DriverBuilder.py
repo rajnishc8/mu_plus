@@ -249,9 +249,9 @@ def GetSubVersions(old_version:str, curr_hashes:dict, old_hashes:dict):
 def GetNextVersion():
     # first get the last version
     old_version = GetLatestNugetVersion(PACKAGE_NAME)  # TODO: get the source from the JSON file that configures this
-    # Then use the nuget dependency to download that version into a temporary folder
+    # Get a temporary folder to download the nuget package into
     temp_nuget_path = tempfile.mkdtemp()
-    print(temp_nuget_path)
+    # Download the Nuget Package
     DownloadNugetPackageVersion(PACKAGE_NAME, old_version, temp_nuget_path)
     # Unpack and read the previous release notes, skipping the header, also get hashes
     old_notes, old_hashes = GetOldReleaseNotesAndHashes(os.path.join(temp_nuget_path, PACKAGE_NAME, PACKAGE_NAME, RELEASE_NOTES_FILENAME))
@@ -375,17 +375,9 @@ class PlatformBuilder(UefiBuilder):
         self.env.SetValue("TARGET", GetBuildTarget(), "Platform Hardcoded")
         self.env.SetValue("BUILDREPORTING", "TRUE", "Platform Hardcoded")
         self.env.SetValue("BUILDREPORT_TYPES", 'PCD DEPEX LIBRARY BUILD_FLAGS', "Platform Hardcoded")
-
-        # self.env.SetValue("CONF_TEMPLATE_DIR", "NetworkPkg", "Conf template directory hardcoded - temporary and should go away")
-
-        self.env.SetValue("LaunchBuildLogProgram", "Notepad", "default - will fail if already set", True)
-        self.env.SetValue("LaunchLogOnSuccess", "False", "default - will fail if already set", True)
-        self.env.SetValue("LaunchLogOnError", "False", "default - will fail if already set", True)
+        # We need to use flash image as it runs after post Build to restore the shell environment
         self.FlashImage = True
 
-        return 0
-
-    def PlatformPostBuild(self):
         return 0
 
     # ------------------------------------------------------------------
@@ -401,6 +393,7 @@ class PlatformBuilder(UefiBuilder):
 
     def PlatformFlashImage(self):
         # we have to restore checkpoint in flash as there are certain steps that run inbetween PostBuild and Flash (build report, etc)
+        # the shell_env is a singleton so it carries over between builds and we need to checkpoint it
         self.env.internal_shell_env.restore_checkpoint(self.shell_checkpoint)  # revert the last checkpoint
         return 0
 
