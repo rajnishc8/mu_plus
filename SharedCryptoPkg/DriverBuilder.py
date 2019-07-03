@@ -160,12 +160,10 @@ def GetCommitHashes(root_dir:os.PathLike):
             raise RuntimeError("we've already found this repo before "+git_repo_name)
         # read the git hash for this repo
         return_buffer = StringIO()
-        print(git_path_dir)
         RunCmd("git", cmd_args, workingdir=git_path_dir, outstream=return_buffer)
-        commit_hash = return_buffer.read()
+        commit_hash = return_buffer.getvalue().strip()
         return_buffer.close()
         found_repos[git_repo_name] = commit_hash
-    raise Exception(found_repos)
     return found_repos
 
 
@@ -210,6 +208,43 @@ def DownloadNugetPackageVersion(package_name:str, version:str, destination:os.Pa
     else:
         return True
 
+def GetReleaseForCommit(commit_hash:str):
+    git_dir = os.path.dirname(SCRIPT_PATH)
+    cmd_args = ["log", '--format="%h %D"', "--all", "-n 100"]
+    return_buffer = StringIO()
+    RunCmd("git", " ".join(cmd_args), workingdir=git_dir, outstream=return_buffer)
+    return_buffer.seek(0)
+    results = return_buffer.readlines()
+    return_buffer.close()
+    log_re = re.compile(r'release/(\d{6})')
+    for log_item in results:
+        commit = log_item[:11]
+        branch = log_item[11:].strip()
+        if len(branch) == 0:
+            continue
+        match = log_re.search(branch)
+        if match:
+            return match.group(1)
+
+    raise RuntimeError("We couldn't find the release branch that we correspond to")
+
+
+def GetSubVersions(old_version:str, curr_hashes:dict, old_hashes:dict):
+    _, _, major, minor = old_version.split(".")
+    differences = []
+    for repo in curr_hashes:
+        if repo not in old_hashes:
+            logging.warning("Skipping comparing "+repo)
+            continue
+        if curr_hashes[repo] != old_hashes[repo]:
+            differences.append(repo)
+    if "OPENSSL" in differences or "MU_TIANO" in differences:
+        major = int(major) + 1
+        minor = 1
+    elif len(differences) > 0:
+        minor = int(minor) + 1
+    return "{}.{}".format(major, minor)
+
 
 def GetNextVersion():
     # first get the last version
@@ -221,20 +256,21 @@ def GetNextVersion():
     # Unpack and read the previous release notes, skipping the header, also get hashes
     old_notes, old_hashes = GetOldReleaseNotesAndHashes(os.path.join(temp_nuget_path, PACKAGE_NAME, PACKAGE_NAME, RELEASE_NOTES_FILENAME))
     # Get the current hashes of open ssl and ourself
-    GetCommitHashes(os.path.dirname(SCRIPT_PATH))
+    curr_hashes = GetCommitHashes(os.path.dirname(SCRIPT_PATH))
     # Figure out what release branch we are in
+    current_release = GetReleaseForCommit(curr_hashes["MU_PLUS"])
     # Put that as the first two pieces of our version
-    # Get the hashes for the ext_deps for this version
+    new_version = current_release[0:4]+"."+current_release[4:]+"."
     # Calculate the newest version
-    # Create the release note from this branch
+    new_version += GetSubVersions(old_version, curr_hashes, old_hashes)
+    if new_version == old_version:
+        raise RuntimeError("We are unable to republish the same version that was published last")
+    # Create the release note from this branch, currently the commit message on the head?
     release_note = GetReleaseNote()
-    print(release_note)
-    new_version = old_version
     # Create our release notes, appending the old ones
-    CreateReleaseNotes(release_note, new_version, old_notes, {"OPENSSL": "231321", "MU_BASECORE":"1231321"})
-    # Clean up the temporary nuget file
-
-    print(new_version)
+    CreateReleaseNotes(release_note, new_version, old_notes, curr_hashes)
+    # Clean up the temporary nuget file?
+    logging.critical("Creating new version:"+new_version)
     return new_version
 
 
