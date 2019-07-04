@@ -1,10 +1,6 @@
 workspace:
   clean: all
 
-variables:
-  API_KEY:
-
-
 trigger: none # will disable CI builds entirely
 
 steps:
@@ -47,5 +43,5 @@ steps:
   inputs:
     scriptSource: 'filePath'
     scriptPath: 'SharedCryptoPkg/DriverBuilder.py'
-    arguments: '--api-key=$(API_KEY)'
+    arguments: '--api-key=$(NUGET_API_KEY)'
     failOnStderr: true
