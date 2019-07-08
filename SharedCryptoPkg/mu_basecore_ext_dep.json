@@ -2,7 +2,7 @@
   "scope": "sharedcrypto_build",
   "type": "git",
   "name": "MU_BASECORE",
-  "source": "https://github.com/Microsoft/mu_basecore.git",
-  "version": "cff8f03663bf5b20b82848e245738e1637951e0e",
+  "source": "https://projectmu@dev.azure.com/projectmu/Mu_Security_Private_Release/_git/mu_basecore",
+  "version": "9b0c3d4d91753a792fa65e6485ff724b98b50581",
   "flags": []
 }
