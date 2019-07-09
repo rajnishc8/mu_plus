@@ -229,8 +229,10 @@ def GetReleaseForCommit(commit_hash:str):
     raise RuntimeError("We couldn't find the release branch that we correspond to")
 
 
-def GetSubVersions(old_version:str, curr_hashes:dict, old_hashes:dict):
-    _, _, major, minor = old_version.split(".")
+def GetSubVersions(old_version:str, current_release:str, curr_hashes:dict, old_hashes:dict):
+    year, month, major, minor = old_version.split(".")
+    curr_year = int(current_release[0:4])
+    curr_mon = int(current_release[4:])
     differences = []
     for repo in curr_hashes:
         if repo not in old_hashes:
@@ -238,7 +240,10 @@ def GetSubVersions(old_version:str, curr_hashes:dict, old_hashes:dict):
             continue
         if curr_hashes[repo] != old_hashes[repo]:
             differences.append(repo)
-    if "OPENSSL" in differences or "MU_TIANO" in differences:
+    if curr_year != int(year) or curr_mon != int(month):
+        major = 1
+        minor = 1
+    elif "OPENSSL" in differences or "MU_TIANO" in differences:
         major = int(major) + 1
         minor = 1
     elif len(differences) > 0:
@@ -262,7 +267,7 @@ def GetNextVersion():
     # Put that as the first two pieces of our version
     new_version = current_release[0:4]+"."+current_release[4:]+"."
     # Calculate the newest version
-    new_version += GetSubVersions(old_version, curr_hashes, old_hashes)
+    new_version += GetSubVersions(old_version, current_release, curr_hashes, old_hashes)
     if new_version == old_version:
         raise RuntimeError("We are unable to republish the same version that was published last")
     # Create the release note from this branch, currently the commit message on the head?
@@ -285,7 +290,7 @@ def PublishNuget():
         VERSION = GetNextVersion()
 
     # move the EFI's we generated to a folder to upload
-    output_dir = os.path.join(rootDir, "Build", "SharedCrypto_Nuget")
+    output_dir = os.path.join(rootDir, "Build", "SharedCrypto_NugetOutput")
     try:
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir, ignore_errors=False)
@@ -317,7 +322,10 @@ def PublishNuget():
         MoveArchTargetSpecificFile(pdb, sharedcrypto_build_dir_offset, output_dir)
 
     for txt in glob.iglob(build_dir_txt_search, recursive=True):
-        CopyFile(txt, output_dir)
+        file_name = os.path.basename(txt)
+        srcDir = os.path.dirname(txt)
+        target = os.path.basename(srcDir)
+        shutil.copyfile(os.path.join(srcDir, file_name), os.path.join(output_dir, target + file_name))
 
 
     if API_KEY is not None:
