@@ -37,7 +37,7 @@ PROJECT_SCOPE = ("corebuild", "sharedcrypto_build")
 MODULE_PKGS = ('SharedCryptoPkg/MU_BASECORE_extdep/MU_BASECORE', "SharedCryptoPkg/MU_ARM_TIANO_extdep/MU_ARM_TIANO", "SharedCryptoPkg/MU_TIANO_extdep/MU_TIANO")
 MODULE_PKG_PATHS = ";".join(os.path.join(WORKSPACE_PATH, pkg_name) for pkg_name in MODULE_PKGS)
 ACTIVE_TARGET = None
-SHOULD_DUMP_VERSION = True
+SHOULD_DUMP_VERSION = False
 RELEASE_NOTES_FILENAME ="release_notes.md"
 PACKAGE_NAME="Mu-SharedCrypto"
 
