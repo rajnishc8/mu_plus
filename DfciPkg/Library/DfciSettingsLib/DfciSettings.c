@@ -3,7 +3,7 @@ DfciSettings.c
 
 Library Instance for DXE to support getting, setting, defaults, and support Dfci settings.
 
-Copyright (c) 2018, Microsoft Corporation
+Copyright (c) Microsoft Corporation
 
 All rights reserved.
 
@@ -59,7 +59,6 @@ typedef enum {
     ID_IS_TENANT_ID,
     ID_IS_FRIENDLY_NAME,
     ID_IS_TENANT_NAME,
-    ID_IS_ENABLE_NETWORK,
 }  ID_IS;
 
 typedef struct  {
@@ -127,8 +126,6 @@ IsIdSupported (DFCI_SETTING_ID_STRING Id)
         return ID_IS_FRIENDLY_NAME;
     } else if (0 == AsciiStrnCmp (Id, DFCI_SETTING_ID__MDM_TENANT_NAME, DFCI_MAX_ID_LEN)) {
         return ID_IS_TENANT_NAME;
-    } else if (0 == AsciiStrnCmp (Id, DFCI_SETTING_ID__ENABLE_NETWORK, DFCI_MAX_ID_LEN)) {
-        return ID_IS_ENABLE_NETWORK;
     } else {
         DEBUG((DEBUG_ERROR, "%a: Called with Invalid ID (%a)\n", __FUNCTION__, Id));
     }
@@ -152,16 +149,17 @@ ValidateNvVariable (
     EFI_STATUS  Status;
     UINT32      Attributes = 0;
     UINTN       ValueSize = 0;
+    VOID       *Value = NULL;
 
 
-    Status = gRT->GetVariable (VariableName,
-                              &gDfciSettingsGuid,
-                              &Attributes,
-                              &ValueSize,
-                               NULL );
+    Status = GetVariable3 (VariableName,
+                          &gDfciSettingsGuid,
+                          (VOID *) &Value,
+                          &ValueSize,
+                          &Attributes);
 
-    if (EFI_BUFFER_TOO_SMALL ==  Status) {             // We have a variable
-        Status = EFI_SUCCESS;
+    if (!EFI_ERROR(Status)) {             // We have a variable
+        FreePool (Value);
         if (DFCI_SETTINGS_ATTRIBUTES != Attributes) {  // Check if Attributes are wrong
             // Delete invalid URL variable
             Status = gRT->SetVariable (VariableName,
@@ -171,9 +169,10 @@ ValidateNvVariable (
                                        NULL);
             if (EFI_ERROR(Status)) {                   // What???
                 DEBUG((DEBUG_ERROR, "%a: Unable to delete invalid variable %s\n", __FUNCTION__, VariableName));
+            } else {
+                DEBUG((DEBUG_INFO, "%a: Deleting invalid variable %s, with attributes %x\n", __FUNCTION__, VariableName, Attributes));
             }
         }
-
     } else {
         Status = EFI_SUCCESS;
     }
@@ -203,7 +202,6 @@ InitializeNvVariables (
     Status |= ValidateNvVariable (DFCI_SETTINGS_TENANT_ID_NAME);
     Status |= ValidateNvVariable (DFCI_SETTINGS_FRIENDLY_NAME);
     Status |= ValidateNvVariable (DFCI_SETTINGS_TENANT_NAME);
-    Status |= ValidateNvVariable (DFCI_SETTINGS_ENABLE_NETWORK);
 
     return Status;
 }
@@ -270,17 +268,6 @@ DfciSettingsSet (
             VariableName = DFCI_SETTINGS_TENANT_NAME;
             break;
 
-        case ID_IS_ENABLE_NETWORK:
-            VariableName = DFCI_SETTINGS_ENABLE_NETWORK;
-            if (ValueSize > sizeof(UINT8)) {
-                ValueSize = sizeof(UINT8);
-            }
-            if ((ValueSize == 0) || ((*(UINT8 *) Value) > 1)) {
-                DEBUG((DEBUG_ERROR, "%a: Invalid Enable/Disable value %d\n", __FUNCTION__, (*(UINT8 *) Value)));
-                return EFI_INVALID_PARAMETER;
-            }
-            break;
-
         default:
             DEBUG((DEBUG_ERROR, "%a: Invalid id(%s).\n", __FUNCTION__, This->Id));
             return EFI_UNSUPPORTED;
@@ -337,7 +324,7 @@ DfciSettingsSet (
     if (EFI_ERROR(Status)) {
         DEBUG((DEBUG_ERROR, "Error setting variable %s.  Code = %r\n", VariableName, Status));
     } else {
-        DEBUG((DEBUG_INFO, "Variable %s set.\n", VariableName));
+        DEBUG((DEBUG_INFO, "Variable %s set Attributes=%x, Size=%d.\n", VariableName, DFCI_SETTINGS_ATTRIBUTES, ValueSize));
     }
 
     return Status;
@@ -397,10 +384,6 @@ DfciSettingsGet (
             ;
         case ID_IS_TENANT_NAME:
             VariableName = DFCI_SETTINGS_TENANT_NAME;
-            break;
-
-        case ID_IS_ENABLE_NETWORK:
-            VariableName = DFCI_SETTINGS_ENABLE_NETWORK;
             break;
 
         default:
@@ -551,11 +534,6 @@ STATIC PROVIDER_ENTRY mDfciSettingsProviders[] = {
     {
         DFCI_SETTING_ID__MDM_TENANT_NAME,
         DFCI_SETTING_TYPE_STRING,
-        DFCI_SETTING_FLAGS_NO_PREBOOT_UI
-    },
-    {
-        DFCI_SETTING_ID__ENABLE_NETWORK,
-        DFCI_SETTING_TYPE_ENABLE,
         DFCI_SETTING_FLAGS_NO_PREBOOT_UI
     }
 

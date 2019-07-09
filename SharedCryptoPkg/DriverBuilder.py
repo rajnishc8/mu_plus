@@ -70,6 +70,7 @@ def GetBuildTarget():
         pbw = __import__("__main__")
         return pbw.ACTIVE_TARGET
 
+
 def ShouldDumpVersion():
     if __name__ == "__main__":
         global SHOULD_DUMP_VERSION
